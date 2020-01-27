@@ -3,6 +3,16 @@ let context = canvas.getContext('2d');
 
 const BASE_SIZE = 30;
 
+type State = {
+  moveCounter: number;
+  moveInterval: number;
+  lastTime: number;
+  X: number;
+  Y: number;
+  /* 40 down, 38 up, 39 right, 37 left */
+  keyPressed: number | null;
+};
+
 function draw({X, Y}, score = 1, direction = 'RIGHT') {
   context.fillStyle = '#000';
   context.fillRect(0, 0, canvas.width, canvas.height);
@@ -20,15 +30,15 @@ function draw({X, Y}, score = 1, direction = 'RIGHT') {
   // context.fillRect(X + BASE_SIZE, Y, BASE_SIZE, BASE_SIZE);
 }
 
+// TODO: wip on collision here
+
 type Collision = {};
 
-function isCollide(X, Y): Collision {
-  return {};
+function isCollide(X: number, Y: number): Collision {
+  return {X, Y};
 }
 
-let createMovement = ({state, setState}) => (
-  direction: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT',
-) => {
+let createMovement = ({state, setState}) => (direction: Direction) => {
   const STEP = 5;
   switch (direction) {
     case 'UP': {
@@ -53,7 +63,7 @@ let createMovement = ({state, setState}) => (
   }
 };
 
-function getDirection(state) {
+function getDirection(state: State) {
   switch (state.keyPressed) {
     /* 40 down, 38 up, 39 right, 37 left */
     case 38: {
@@ -72,54 +82,68 @@ function getDirection(state) {
   }
 }
 
+type Direction = 'UP' | 'LEFT' | 'DOWN' | 'RIGHT';
+
+function safeDirection(directionString: string) {
+  switch (directionString) {
+    case 'UP':
+    case 'DOWN':
+    case 'RIGHT':
+    case 'LEFT':
+      return directionString;
+    default:
+      return 'RIGHT';
+  }
+}
+
 function Scene({state, setState, draw}) {
-  return {
-    state,
-    setState,
-    run(time = 0) {
-      let {lastTime, X, Y, keyPressed, moveCounter, moveInterval} = this.state;
+  this.state = state;
+  this.setState = setState;
+  this.run = function(time: number = 0) {
+    let {lastTime, X, Y, moveCounter, moveInterval} = this.state;
 
-      const MAX_WIDTH = canvas.width;
-      const MAX_HEIGHT = canvas.height;
+    const MAX_WIDTH = canvas.width;
+    const MAX_HEIGHT = canvas.height;
 
-      let deltaTime = time - lastTime;
+    let deltaTime = time - lastTime;
 
-      let move = createMovement({
-        state: this.state,
-        setState: this.setState.bind(this),
-      });
+    let move = createMovement({
+      state: this.state,
+      setState: this.setState.bind(this),
+    });
 
-      this.setState({
-        lastTime: time,
-        moveCounter: moveCounter + deltaTime,
-      });
+    this.setState({
+      lastTime: time,
+      moveCounter: moveCounter + deltaTime,
+    });
 
-      if (moveCounter > moveInterval) {
-        let direction = getDirection(this.state);
-        if (X >= MAX_WIDTH) {
-          this.setState({X: -BASE_SIZE});
-        } else if (direction === 'LEFT' && X <= -BASE_SIZE) {
-          this.setState({X: MAX_WIDTH - 1});
-        } else if (Y >= MAX_HEIGHT) {
-          this.setState({Y: -BASE_SIZE});
-        } else if (direction === 'UP' && Y <= -BASE_SIZE) {
-          this.setState({Y: MAX_HEIGHT - 1});
-        } else {
-          move(direction);
-        }
-        this.setState({moveCounter: 0});
+    if (moveCounter > moveInterval) {
+      let direction = getDirection(this.state);
+      if (X >= MAX_WIDTH) {
+        this.setState({X: -BASE_SIZE});
+      } else if (direction === 'LEFT' && X <= -BASE_SIZE) {
+        this.setState({X: MAX_WIDTH - 1});
+      } else if (Y >= MAX_HEIGHT) {
+        this.setState({Y: -BASE_SIZE});
+      } else if (direction === 'UP' && Y <= -BASE_SIZE) {
+        this.setState({Y: MAX_HEIGHT - 1});
+      } else {
+        move(safeDirection(direction));
       }
-      draw({X, Y});
-    },
+      this.setState({moveCounter: 0});
+    }
+    draw({X, Y});
   };
 }
 
-function DataStore(initState) {
+type Json = {[key: string]: number | string | Json | Array<Json>};
+
+function DataStore(initState: Json) {
   this.state = initState;
   this.getState = function() {
     return this.state;
   };
-  this.setState = function(newState) {
+  this.setState = function(newState: Json) {
     this.state = {...this.state, ...newState};
   };
 }
